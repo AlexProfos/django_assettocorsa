@@ -1,0 +1,24 @@
+{% extends 'admin/base_site.html' %}
+
+{% block content %}
+{% if username != '' %}
+<h1>Hello {{ username }}</h1>
+    {% if do_nothing == 'false' %}
+<p>The Server with name {{ config_name }} will be started.</p>
+    {% elif do_nothing == 'true' %}
+<p>The server with name {{ config_name }} has already been started.</p>
+    {% else %}
+<p>The server with name {{ config_name }} can't be started, either ports already in use.</p>
+    {% endif %}
+<button onclick="goBack()">Go Back</button>
+
+<script>
+window.setTimeout('history.back();', 5000);
+function goBack() {
+        window.history.back();
+}
+</script>
+{% else %}
+<p>Go Away!</p>
+{% endif %}
+{% endblock %}
