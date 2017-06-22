@@ -381,7 +381,7 @@ class ConfigFile(models.Model):
     )
 # Book
     booking = models.BooleanField(
-        default=False,
+        default=True,
         help_text='Enable/Disable Booking mode'
     )
     book_name = models.CharField(
