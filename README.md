@@ -1,4 +1,4 @@
-This is a simple Django app for managing Assetto Corsa Servers, without entry_list.cfg and booking mode enabled.
+This is a simple Django app for managing Assetto Corsa Servers.
 
 # *Installation*
 - put this code into your django folder
