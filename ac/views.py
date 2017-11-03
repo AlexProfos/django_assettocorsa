@@ -1,17 +1,34 @@
 import os
 import re
+from django.conf import settings
 from django.http import HttpResponse
 from django.template import loader, Context, Template
 from django.utils import timezone
-from .models import ConfigTemplate, ConfigFile, CarClass, TrackList, Weather, Tyre
+from .models import ConfigFile
+from .models import Car
+from .models import ConfigTemplate
+from .models import CarClass
+from .models import TrackList
+from .models import Weather
+from .models import Tyre
+from .models import Download
+from .models import Teams
+from .models import EntryListUsers
+from .models import EntryLists
+from collections import defaultdict
+from django.utils.timezone import activate, localtime, now
 
+
+activate(settings.TIME_ZONE)
 # Create your views here.
 def start_server(request, config_id):
     do_nothing = 'true'
     html_template = loader.get_template('start_server.template')
     if request.user.is_staff is True:
         for x in ConfigFile.objects.all().filter(pk=config_id):
-            config_name = x.config_name.strip()
+            started_by = request.user.username
+            config_name_orig = x.config_name
+            config_name = re.sub(r'[^\w]', '', x.config_name)
             creation_date = x.creation_date
             author = x.author
             udp_tcp_port = x.udp_tcp_port
@@ -31,7 +48,7 @@ def start_server(request, config_id):
             admin_password = x.admin_password
             car_list = ''
             for y in CarClass.objects.all().filter(class_name=x.cars_classes):
-                for car in y.cars.all():
+                for car in y.cars.all().values_list('car'):
                     car_list += '%s;' % car
                 cars = car_list[:-1]
             for z in TrackList.objects.all().filter(track_name=x.tracks):
@@ -51,8 +68,10 @@ def start_server(request, config_id):
                 register_to_lobby = 0
             if x.pickup_mode_enabled is True:
                 pickup_mode_enabled = 1
+                gen_entry_list = True
             else:
                 pickup_mode_enabled = 0
+                gen_entry_list = False
             sleep_timer = x.sleep_timer
             voting_quorum = x.voting_quorum
             vote_duration = x.vote_duration
@@ -93,6 +112,7 @@ def start_server(request, config_id):
             race_pit_window_end = x.race_pit_window_end
             reversed_grid_race_positions = x.reversed_grid_race_positions
             time_of_day_mult = x.time_of_day_mult
+            max_contacts_per_km = x.max_contacts_per_km
             dyn_track = x.dyn_track
             dyn_track_session_start = x.dyn_track_session_start
             dyn_track_randomness = x.dyn_track_randomness
@@ -124,7 +144,32 @@ def start_server(request, config_id):
             wind_base_speed_max = x.wind_base_speed_max
             wind_base_direction = x.wind_base_direction
             wind_variation_direction = x.wind_variation_direction
-# Set config active on server for the overview
+            entrylistusers_list = defaultdict(list)
+            for d in EntryLists.objects.all().filter(entrylist=x.entrylist):
+                count = 0
+                for entrylistuser in d.entrylistusers.all():
+                    if entrylistuser.spectator is True:
+                        entryspectator = 1
+                    else:
+                        entryspectator = 0
+                    for entrycars in Car.objects.all().filter(car_name=entrylistuser.entrycar):
+                        entrycar = entrycars.car
+                    entrydrivername = re.sub(r'[^\w]', '', str(entrylistuser.drivername))
+                    entryteamname = re.sub(r'[^\w]', '', str(entrylistuser.teamname))
+                    entrylistusers_list[count].append(
+                        [
+                            entrydrivername,
+                            entryteamname,
+                            entrycar,
+                            entrylistuser.skin,
+                            entrylistuser.guid,
+                            entryspectator,
+                            entrylistuser.ballast,
+                            entrylistuser.restrictor
+                        ]
+                    )
+                    count += 1
+            # Set config active on server for the overview
             if x.active_on_server is False and do_nothing == 'true':
                 x.active_on_server = True
                 x.last_updated = timezone.now()
@@ -138,14 +183,14 @@ def start_server(request, config_id):
         html_context = {
             'do_nothing': do_nothing,
             'username': user,
-            'config_name': config_name,
+            'config_name': config_name_orig,
         }
 
 # If update is True overwrite config on server
-        config_template = ConfigTemplate.objects.get(template_active=True)
+        config_template = ConfigTemplate.objects.get(template_active=True, entrylist=False)
         template = Template(config_template.template)
         data = {
-            'config_name': config_name,
+            'config_name': config_name_orig,
             'creation_date': creation_date,
             'udp_tcp_port': udp_tcp_port,
             'http_port': http_port,
@@ -193,6 +238,7 @@ def start_server(request, config_id):
             'race_pit_window_end': race_pit_window_end,
             'reversed_grid_race_positions': reversed_grid_race_positions,
             'time_of_day_mult': time_of_day_mult,
+            'max_contacts_per_km': max_contacts_per_km,
             'dyn_track': dyn_track,
             'dyn_track_session_start': dyn_track_session_start,
             'dyn_track_randomness': dyn_track_randomness,
@@ -224,6 +270,8 @@ def start_server(request, config_id):
             'wind_base_direction': wind_base_direction,
             'wind_variation_direction': wind_variation_direction,
             'author': author,
+            'started_by': started_by,
+            'started_at': localtime(now()),
         }
         context = Context(data)
 
@@ -237,6 +285,40 @@ def start_server(request, config_id):
             start_file = config_template.config_folder + config_name + '.start'
             with open(start_file, 'w') as start:
                 print(config_name, file=start)
+            if gen_entry_list is True:
+                count = 0
+                for dic in entrylistusers_list.items():
+                    for entry in dic[1]:
+                        entry_list_number = count
+                        drivername = entry[0]
+                        teamname = entry[1]
+                        entrylist_car = entry[2]
+                        skin = entry[3]
+                        guid = entry[4]
+                        spectator = entry[5]
+                        ballast = entry[6]
+                        restrictor = entry[7]
+                        entrylist_data = {
+                            'entry_list_number': entry_list_number,
+                            'drivername': drivername,
+                            'teamname': teamname,
+                            'car': entrylist_car,
+                            'skin': skin,
+                            'guid': guid,
+                            'spectator': spectator,
+                            'ballast': ballast,
+                            'restrictor': restrictor,
+                        }
+                        count += 1
+                        entrylist_context = Context(entrylist_data)
+                        config_template = ConfigTemplate.objects.get(template_active=True, entrylist=True)
+                        entrylist_template = Template(config_template.template)
+                        entry_filename = 'entry_list_' + config_name + '.ini'
+                        entry_fullpath = config_template.config_folder + entry_filename
+                        with open(entry_fullpath, 'a') as entry:
+                            entry.write(re.sub("\r?\n", "\n", entrylist_template.render(entrylist_context)))
+                            entry.write('\n\n')
+
     else:
         html_context = {
             'do_nothing': do_nothing,
@@ -249,9 +331,10 @@ def stop_server(request, config_id):
     do_nothing = True
     html_template = loader.get_template('stop_server.template')
     if request.user.is_staff is True:
-        config_template = ConfigTemplate.objects.get(template_active=True)
+        config_template = ConfigTemplate.objects.get(template_active=True, entrylist=False)
         for x in ConfigFile.objects.all().filter(pk=config_id):
-            config_name = x.config_name.strip()
+            config_name_orig = x.config_name
+            config_name = re.sub(r'[^\w]', '', x.config_name)
             if x.active_on_server is True:
                 x.active_on_server = False
                 x.last_updated = timezone.now()
@@ -269,7 +352,7 @@ def stop_server(request, config_id):
         html_context = {
             'do_nothing': do_nothing,
             'username': user,
-            'config_name': config_name,
+            'config_name': config_name_orig,
         }
     else:
         html_context = {
@@ -277,4 +360,13 @@ def stop_server(request, config_id):
             'username': '',
             'config_name': '',
         }
+    return HttpResponse(html_template.render(html_context, request))
+
+
+def download(request):
+    html_template = loader.get_template('downloads.template')
+    downloads = Download.objects.all()
+    html_context = {
+        'downloads': downloads,
+    }
     return HttpResponse(html_template.render(html_context, request))

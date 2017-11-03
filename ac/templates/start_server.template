@@ -4,11 +4,11 @@
 {% if username != '' %}
 <h1>Hello {{ username }}</h1>
     {% if do_nothing == 'false' %}
-<p>The Server with name {{ config_name }} will be started.</p>
+<p>The Server with name <b><i>{{ config_name }}</i></b> will be started.</p>
     {% elif do_nothing == 'true' %}
-<p>The server with name {{ config_name }} has already been started.</p>
+<p>The server with name <b><i>{{ config_name }}</i></b> has already been started.</p>
     {% else %}
-<p>The server with name {{ config_name }} can't be started, either ports already in use.</p>
+<p>The server with name <b><i>{{ config_name }}</i></b> can't be started, either ports already in use.</p>
     {% endif %}
 <button onclick="goBack()">Go Back</button>
 

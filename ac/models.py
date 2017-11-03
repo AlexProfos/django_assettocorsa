@@ -1,7 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+
 # Create your models here.
+
 
 class ConfigTemplate(models.Model):
     class Meta:
@@ -16,6 +18,9 @@ class ConfigTemplate(models.Model):
         default='temp'
     )
     template_active = models.BooleanField(
+        default=False
+    )
+    entrylist = models.BooleanField(
         default=False
     )
     template = models.TextField()
@@ -40,20 +45,26 @@ class ConfigTemplate(models.Model):
         blank=True
     )
 
+
 class Car(models.Model):
     class Meta:
         verbose_name = 'Car'
         verbose_name_plural = "Cars"
 
     def __str__(self):
-        return self.car
+        return self.car_name
 
+    car_name = models.CharField(
+        default='',
+        max_length=32
+    )
     car = models.CharField(
         max_length=32
     )
 
     class Meta:
-        ordering = ['car']
+        ordering = ['car_name']
+
 
 class CarClass(models.Model):
     class Meta:
@@ -71,6 +82,7 @@ class CarClass(models.Model):
     cars = models.ManyToManyField(
         Car
     )
+
 
 class TrackList(models.Model):
     class Meta:
@@ -99,6 +111,7 @@ class TrackList(models.Model):
         blank=True,
         help_text='check acserver/content/tracks/"track"/*'
     )
+
 
 class Tyre(models.Model):
     def __str__(self):
@@ -139,6 +152,100 @@ class Weather(models.Model):
         blank=False
     )
 
+
+class Teams(models.Model):
+    class Meta:
+        verbose_name = 'Team'
+        verbose_name_plural = "Teams"
+
+    def __str__(self):
+        return self.team
+
+    team = models.CharField(
+        max_length=32,
+        blank=False,
+        help_text='Teamname',
+    )
+
+
+class EntryListUsers(models.Model):
+    class Meta:
+        verbose_name = 'EntryListUser'
+        verbose_name_plural = "EntryListsUsers"
+
+    def __str__(self):
+        return self.name
+
+    name = models.CharField(
+        default='DisplayName',
+        max_length=32,
+        blank=False,
+        help_text='Overview Name'
+    )
+    drivername = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text='Drivername'
+    )
+    teamname = models.ForeignKey(
+        Teams,
+        default='2',
+        null=False,
+        blank=False,
+        help_text='Teamname'
+    )
+    entrycar = models.ForeignKey(
+        Car,
+        null=True,
+        blank=False,
+        help_text='Driver Car'
+    )
+    skin = models.CharField(
+        max_length=64,
+        null=True,
+        blank=False,
+        help_text='car skin -  that\'s exactly the skin folder\'s name (into the "content/cars/MODEL/skins" folder)'
+    )
+    guid = models.CharField(
+        default='',
+        max_length=64,
+        null=False,
+        blank=True,
+        help_text='STEAM64 GUID'
+    )
+    spectator = models.BooleanField(
+        default=False
+    )
+    ballast = models.IntegerField(
+        default=0,
+        help_text='Additional ballast (in KG) of the driver (effects handling)'
+    )
+    restrictor = models.IntegerField(
+        default=0,
+        help_text='restricts engine power from 0 to 100% (doesn\'t effect handling)',
+    )
+
+
+class EntryLists(models.Model):
+    class Meta:
+        verbose_name = 'EntryList'
+        verbose_name_plural = "EntryLists"
+
+    def __str__(self):
+        return self.entrylist
+
+    entrylist = models.CharField(
+        default='EntryListName',
+        max_length=32,
+        blank=False,
+        help_text='entry list name needed for identification'
+    )
+    entrylistusers = models.ManyToManyField(
+        EntryListUsers,
+        blank=True,
+    )
+
+
 class ConfigFile(models.Model):
     class Meta:
         verbose_name = 'Configfile'
@@ -165,7 +272,8 @@ class ConfigFile(models.Model):
         auto_now_add=True
     )
     udp_tcp_port = models.IntegerField(
-        unique=False, default=9600
+        unique=False,
+        default=9600
     )
     http_port = models.IntegerField(
         default=8081
@@ -197,18 +305,18 @@ class ConfigFile(models.Model):
         blank=False
     )
     sun_angle = models.IntegerField(
-        default=48
+        default=55
     )
     max_clients = models.IntegerField(
         default=16,
         help_text='Depends on the servers network performance and the Tracks Pit Slots.'
     )
     race_over_time = models.IntegerField(
-        default=30,
+        default=120,
         help_text='Time left after the leader finishes the race (in seconds)'
     )
     allowed_tyres_out = models.IntegerField(
-        default=-1,
+        default=3,
         help_text='penalty (-1 disabled)'
     )
     loop_mode = models.BooleanField(
@@ -216,8 +324,8 @@ class ConfigFile(models.Model):
         help_text='the server restarts from the first track, if active'
     )
     register_to_lobby = models.BooleanField(
-        default=False,
-        help_text='this must not be touched'
+        default=True,
+        help_text='Show in Serverbrowser'
     )
     pickup_mode_enabled = models.BooleanField(
         default=False,
@@ -286,7 +394,7 @@ class ConfigFile(models.Model):
         help_text='path of a file who contains the server welcome message'
     )
     start_rule = models.IntegerField(
-        default=1,
+        default=2,
         help_text='0 is car locked until start; 1 is teleport; 2 is drivethru (if race has 3 or less laps then the Teleport penalty is enabled)'
     )
     num_threads = models.IntegerField(
@@ -294,7 +402,7 @@ class ConfigFile(models.Model):
         help_text='number of server cpu threads used'
     )
     force_virtual_mirror = models.BooleanField(
-        default=True,
+        default=False,
         help_text='active = virtual mirror will be enabled for every client, disabled = mirror as optional'
     )
     legal_tyre = models.ManyToManyField(
@@ -306,22 +414,24 @@ class ConfigFile(models.Model):
         help_text='the max total of ballast that can be added through the admin command'
     )
     udp_plugin_local_port = models.CharField(
+        default='',
         max_length=5,
         blank=True,
         help_text='this must not be touched'
     )
     udp_plugin_address = models.CharField(
-        max_length=15,
+        default='',
+        max_length=32,
         blank=True,
         help_text='this must not be touched'
     )
     auth_plugin_address = models.CharField(
-        max_length=15,
+        max_length=256,
         blank=True,
         help_text='this must not be touched'
     )
     race_gas_penalty_disabled = models.IntegerField(
-        default=0,
+        default=1,
         help_text='0 any cut will be penalized with the gas cut message; 1 no penalization will be forced, but cuts will be saved in the race result json.'
     )
     result_screen_time = models.IntegerField(
@@ -329,7 +439,7 @@ class ConfigFile(models.Model):
         help_text='seconds of result screen between racing sessions.'
     )
     race_extra_lap = models.IntegerField(
-        default=0,
+        default=1,
         help_text='if it is a timed race, with 1 the race will not end when the time is over and the leader crosses the line, but the latter will be forced to drive another extra lap.'
     )
     locked_entry_list = models.IntegerField(
@@ -355,7 +465,7 @@ class ConfigFile(models.Model):
         help_text='multiplier for the time of day'
     )
     max_contacts_per_km = models.IntegerField(
-        default=5,
+        default=3,
         help_text='max allowed contacts per KM'
     )
 # Dynamic Track
@@ -364,19 +474,19 @@ class ConfigFile(models.Model):
         help_text='Enable/Disable Dynamic Track'
     )
     dyn_track_session_start = models.IntegerField(
-        default=90,
+        default=93,
         help_text='% level of grip at session start'
     )
     dyn_track_randomness = models.IntegerField(
-        default=1,
+        default=3,
         help_text='level of randomness added to the start grip'
     )
     dyn_track_lap_gain = models.IntegerField(
-        default=1,
+        default=4,
         help_text='how many laps are needed to add 1% grip'
     )
     dyn_track_session_transfer = models.IntegerField(
-        default=50,
+        default=85,
         help_text='how much of the gained grip is to be added to the next session 100 -> all the gained grip. Example: difference between starting (90) and ending (96) grip in the session = 6%, with session_transfer = 50 then the next session is going to start with 93.'
     )
 # Book
@@ -390,7 +500,7 @@ class ConfigFile(models.Model):
         blank=True
     )
     book_time = models.IntegerField(
-        default=5,
+        default=2,
         help_text='session length in minutes'
     )
 # Practice
@@ -404,7 +514,7 @@ class ConfigFile(models.Model):
         blank=True
     )
     practice_time = models.IntegerField(
-        default=15,
+        default=20,
         help_text='session length in minutes'
     )
     practice_is_open = models.IntegerField(
@@ -422,7 +532,7 @@ class ConfigFile(models.Model):
         blank=True
     )
     qualify_time = models.IntegerField(
-        default=15,
+        default=10,
         help_text='session length in minutes'
     )
     qualify_is_open = models.IntegerField(
@@ -435,11 +545,11 @@ class ConfigFile(models.Model):
         default='Race'
     )
     race_laps = models.IntegerField(
-        default=10,
+        default=0,
         help_text='length of the lap races'
     )
     race_time = models.IntegerField(
-        default=0,
+        default=20,
         help_text='length of the timed races, only if laps = 0'
     )
     race_wait_time = models.IntegerField(
@@ -454,10 +564,11 @@ class ConfigFile(models.Model):
     weather_graphics = models.ForeignKey(
         Weather,
         null=True,
-        blank=False
+        blank=False,
+        default=6,
     )
     weather_base_temperature_ambient = models.IntegerField(
-        default=20,
+        default=26,
         help_text='temperature of the Ambient'
     )
     weather_variation_ambient = models.IntegerField(
@@ -465,7 +576,7 @@ class ConfigFile(models.Model):
         help_text='variation of the ambients temperature. In this example final ambients temperature can be 16 or 20'
     )
     weather_base_temperature_road = models.IntegerField(
-        default=6,
+        default=4,
         help_text='Relative road temperature: this value will be added to the final ambient temp. In this example the road temperature will be between 22 (16 + 6) and 26 (20 + 6). It can be negative.'
     )
     weather_variation_road = models.IntegerField(
@@ -474,24 +585,33 @@ class ConfigFile(models.Model):
     )
 # Wind
     wind_base_speed_min = models.IntegerField(
-        default=3,
+        default=6,
         help_text='Min speed of the session possible'
     )
     wind_base_speed_max = models.IntegerField(
-        default=15,
+        default=25,
         help_text='Max speed of session possible (max 40)'
     )
     wind_base_direction = models.IntegerField(
-        default=50,
+        default=180,
         help_text='base direction of the wind (wind is pointing at); 0 = North, 90 = East etc'
     )
     wind_variation_direction = models.IntegerField(
-        default=15,
+        default=180,
         help_text='variation (+ or -) of the base direction'
+    )
+    entrylist = models.ForeignKey(
+        EntryLists,
+        null=True,
+        blank=False,
+        default=1
     )
 # Author
     author = models.ForeignKey(
         User,
+        null=True,
         blank=True,
-        help_text='Config creator'
+        help_text='Config creator',
     )
+
+

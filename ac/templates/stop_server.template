@@ -4,9 +4,9 @@
 {% if username != '' %}
 <h1>Hello {{ username }}</h1>
     {% if do_nothing is False %}
-<p>The Server with name {{ config_name }} will be stopped.</p>
+<p>The Server with name <b><i>{{ config_name }}</i></b> will be stopped.</p>
     {% else %}
-<p>The server with name {{ config_name }} has already been stopped.</p>
+<p>The server with name <b><i>{{ config_name }}</i></b> has already been stopped.</p>
     {% endif %}
 <button onclick="goBack()">Go Back</button>
 
